@@ -15,6 +15,11 @@ class C19Impformation(object):
         self.config = self.read_from_file(configfile)
         self.tokens = None
 
+        if self.config['abusecontact']:
+            self.session.headers.update({
+                'X-Abuse-Contact': self.config['abusecontact']
+            })
+
     def get_env(self, iam=False):
         if 'env' not in self.config or self.config['env'] == 'prod':
             return '{}impfzentren.bayern'.format('ciam.' if iam else '')

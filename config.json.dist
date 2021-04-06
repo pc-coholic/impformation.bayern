@@ -3,5 +3,6 @@
   "password": "",
   "credentialId": "",
   "env": "prod",
-  "userUUID": ""
+  "userUUID": "",
+  "abusecontact": ""
 }
