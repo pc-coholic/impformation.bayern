@@ -155,7 +155,7 @@ class C19Impformation(object):
         for district, centerIds in centers.items():
             for center in centerIds:
                 sites.update(
-                    c19.get_sites_for_center(center)
+                    self.get_sites_for_center(center)
                 )
 
         return sites
