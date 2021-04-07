@@ -210,9 +210,9 @@ class C19Impformation(object):
     def get_appointments(self, sites):
         appointments = {}
         for siteId, siteData in sites.items():
-            appointments.update(
-                self.get_appointments_for_site(siteId, siteData)
-            )
+            appointments.update({
+                siteId: self.get_appointments_for_site(siteId, siteData)
+            })
 
         return appointments
 
@@ -235,4 +235,4 @@ if __name__ == '__main__':
     c19.write_to_file('sites.json', sites)
 
     appointments = c19.get_appointments(sites)
-    c19.write_to_file('appointments.json', sites)
+    c19.write_to_file('appointments.json', appointments)
