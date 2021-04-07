@@ -36,15 +36,23 @@ be nice to the BayIMCO-servers and have only a single instance poll the data, ok
   
 * https://impformation.bayern/appointments.json:
 
-    The same file as sites.json, but each site has a few more attributes:
+    The same file as `sites.json`, but each site has a few more attributes:
     * `first_available`:
       * `null` if no upcoming available vaccination appoint could be determined
       * dict of `date`, `time`, `vaccine` if an upcoming available vaccination appoint could be determined
     * `lastcheck`: DateTime when we last touched/checked this site.
+  
+* https://impformation.bayern/appointments60.json:
+
+    The same file as `appointments.json`, but this time we list the available appointments for people over the age of 
+    60. Since (as of 07.04.2021) AstraZeneca is only recommended for to people over the age of 60, expect to see a lot 
+    more appointments available with this vaccine in this file and probably not a single one in the `appointments.json`.
     
 
-If you want to build your own service, polling the `appointments.json` on a regular base should probably be more than 
-enough. At this point, we are aiming to provide an update approximately every 5 minutes.
+If you want to build your own service, polling `appointments.json` and `appointments60.json` on a regular base should 
+probably be more than enough. At this point, we are aiming to provide an update approximately every 5 minutes.
+
+In the near future, the separate `appointment.json`-files will be merged into a single one with a better syntax. 
 
 
 **Abuse Contact**
