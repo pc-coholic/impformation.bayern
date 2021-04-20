@@ -87,7 +87,10 @@ class C19Impformation(object):
 
         return {
             'Authorization': 'Bearer {access_token}'.format(
-                access_token=self.tokens['access_token']
+                # We should use the access token and track the `expires_in`-time (300sec/5min).
+                # But I'm feeling lazy today and so we're using the refresh_token, which only expires in 1800sec/30min.
+                #access_token=self.tokens['access_token']
+                access_token=self.tokens['refresh_token']
             )
         }
 
