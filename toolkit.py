@@ -203,7 +203,7 @@ class C19Impformation(object):
                     'vaccine': data['vaccineId']
                 }
             else:
-                print("Something went wrong...")
+                print("Something went wrong...", resp.status_code)
                 siteData['first_available'] = None
         finally:
             siteData['lastcheck'] = datetime.today().strftime('%Y-%m-%d %H:%M')
