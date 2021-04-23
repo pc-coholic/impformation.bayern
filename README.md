@@ -12,11 +12,11 @@ be nice to the BayIMCO-servers and have only a single instance poll the data, ok
 **Important Notice**
 
 The `/api/v1/citizens/{userUUID}/appointments/next`-endpoint is heavily ratelimited (about 30 requests/15 minutes). 
-After hitting the limit, it will only return `404` and behave like if there are no appointments availble.
+After hitting the limit, it will only return `404` and behave like if there are no appointments available.
 
 Also: Be aware that *the powers that be*™ do not appreciate services like https://impformation.bayern/ and might send 
 the LKA to your door, claiming your script might be causing 10% and more of the daily server load... Proceed at your 
-own risk. But do let me know, if that happens to you - I'd love to share a good laugh with you.
+own risk. But do let me know if that happens to you - I'd love to share a good laugh with you.
 
 **Available Data Sources**
 
