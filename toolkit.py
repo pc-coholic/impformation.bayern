@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import io
 import json
+import sys
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 from uuid import uuid4
@@ -11,86 +12,112 @@ from bs4 import BeautifulSoup
 
 class C19Impformation(object):
     def __init__(self, configfile='config.json'):
-        self.session = requests.Session()
+        self.session = []
         self.config = self.read_from_file(configfile)
-        self.tokens = None
+        self.tokens = []
+        self.lastset = -1
 
+        if isinstance(self.config, dict):
+            self.config = [self.config]
+        elif isinstance(self.config, list):
+            pass
+        else:
+            print("something might be of with the config file...")
+            sys.exit()
+        """
         if self.config['abusecontact']:
             self.session.headers.update({
                 'X-Abuse-Contact': self.config['abusecontact']
             })
+        """
 
-    def get_env(self, iam=False):
-        if 'env' not in self.config or self.config['env'] == 'prod':
+    def get_sets_and_session(self):
+        self.lastset += 1
+        if self.lastset == len(self.config):
+            self.lastset = 0
+
+        return self.config[self.lastset], self.tokens[self.lastset], self.session[self.lastset]
+
+    def get_env(self, iam=False, configset=None):
+        if not configset:
+            configset = self.config[0]
+
+        if 'env' not in configset or configset['env'] == 'prod':
             return '{}impfzentren.bayern'.format('ciam.' if iam else '')
         else:
-            return '{}{}impfzentren.bayern'.format(self.config['env'], '-ciam.' if iam else '')
+            return '{}{}impfzentren.bayern'.format(configset['env'], '-ciam.' if iam else '')
 
     def login(self):
-        # Get the login-form
-        resp = self.session.get(
-            'https://{env}/auth/realms/C19V-Citizen/protocol/openid-connect/auth'.format(
-                env=self.get_env(iam=True)
-            ),
-            params={
-                'client_id': 'c19v-frontend',
-                'redirect_uri': 'https://{env}/citizen/'.format(
-                    env=self.get_env()
+        for configset in self.config:
+            self.session.append(requests.Session())
+
+            # Get the login-form
+            resp = self.session[-1].get(
+                'https://{env}/auth/realms/C19V-Citizen/protocol/openid-connect/auth'.format(
+                    env=self.get_env(iam=True, configset=configset)
                 ),
-                'response_mode': 'fragment',
-                'response_type': 'code',
-                'scope': 'openid',
-                'nonce': uuid4()
-            }
-        )
+                params={
+                    'client_id': 'c19v-frontend',
+                    'redirect_uri': 'https://{env}/citizen/'.format(
+                        env=self.get_env(configset=configset)
+                    ),
+                    'response_mode': 'fragment',
+                    'response_type': 'code',
+                    'scope': 'openid',
+                    'nonce': uuid4()
+                }
+            )
 
-        # Parse the login-form and retrieve the submit-action which includes all kinds of query-parameters
-        soup = BeautifulSoup(resp.content, 'html.parser')
-        auth_url = soup.find(id='kc-form-login').attrs['action']
+            # Parse the login-form and retrieve the submit-action which includes all kinds of query-parameters
+            soup = BeautifulSoup(resp.content, 'html.parser')
+            auth_url = soup.find(id='kc-form-login').attrs['action']
 
-        # Post to the parsed Authorization URL using our credentials
-        resp = self.session.post(
-            auth_url,
-            data={
-                'username': self.config['username'],
-                'password': self.config['password'],
-                'credentialId': self.config['credentialId'],
-            },
-            allow_redirects=False
-        )
+            # Post to the parsed Authorization URL using our credentials
+            resp = self.session[-1].post(
+                auth_url,
+                data={
+                    'username': configset['username'],
+                    'password': configset['password'],
+                    'credentialId': configset['credentialId'],
+                },
+                allow_redirects=False
+            )
 
-        # Retrieve the location we are being redirected and get the code-attribute
-        url = urlparse(resp.headers['location'])
-        code = parse_qs(url.fragment)['code']
+            # Retrieve the location we are being redirected and get the code-attribute
+            url = urlparse(resp.headers['location'])
+            code = parse_qs(url.fragment)['code']
 
-        # Request a new token using the code we just received
-        resp = self.session.post(
-            'https://{env}/auth/realms/C19V-Citizen/protocol/openid-connect/token'.format(
-                env=self.get_env(iam=True)
-            ),
-            data={
-                'client_id': 'c19v-frontend',
-                'grant_type': 'authorization_code',
-                'code': code,
-                'redirect_uri': 'https://{env}/citizen/'.format(
-                    env=self.get_env()
-                )
-            }
-        )
+            # Request a new token using the code we just received
+            resp = self.session[-1].post(
+                'https://{env}/auth/realms/C19V-Citizen/protocol/openid-connect/token'.format(
+                    env=self.get_env(iam=True, configset=configset)
+                ),
+                data={
+                    'client_id': 'c19v-frontend',
+                    'grant_type': 'authorization_code',
+                    'code': code,
+                    'redirect_uri': 'https://{env}/citizen/'.format(
+                        env=self.get_env(configset=configset)
+                    )
+                }
+            )
 
-        # Store the tokens for later use.
-        self.tokens = resp.json()
+            # Store the tokens for later use.
+            self.tokens.append(resp.json())
 
-    def get_authorization_header(self):
-        if 'access_token' not in self.tokens:
+    def get_authorization_header(self, tokenset=None):
+        if not tokenset:
+            tokenset = self.tokens[0]
+
+        if 'access_token' not in tokenset:
             raise Exception('No access_token available!')
 
         return {
             'Authorization': 'Bearer {access_token}'.format(
                 # We should use the access token and track the `expires_in`-time (300sec/5min).
                 # But I'm feeling lazy today and so we're using the refresh_token, which only expires in 1800sec/30min.
-                #access_token=self.tokens['access_token']
-                access_token=self.tokens['refresh_token']
+                #access_token=tokenset['access_token']
+                access_token=tokenset['refresh_token']
             )
         }
 
@@ -104,24 +131,26 @@ class C19Impformation(object):
 
     def get_vaccines(self):
         print("Getting vaccines")
+        configset, tokenset, session = self.get_sets_and_session()
 
-        resp = self.session.get(
+        resp = session.get(
             'https://{env}/api/v1/vaccines/'.format(
-                env=self.get_env()
+                env=self.get_env(configset=configset)
             ),
-            headers=self.get_authorization_header()
+            headers=self.get_authorization_header(tokenset=tokenset)
         )
 
         return resp.json()
 
     def get_districts(self):
         print("Getting districts")
+        configset, tokenset, session = self.get_sets_and_session()
 
-        resp = self.session.get(
+        resp = session.get(
             'https://{env}/api/v1/districts/'.format(
-                env=self.get_env()
+                env=self.get_env(configset=configset)
             ),
-            headers=self.get_authorization_header()
+            headers=self.get_authorization_header(tokenset=tokenset)
         )
 
         return resp.json()
@@ -137,13 +166,14 @@ class C19Impformation(object):
         print("Getting Sites for center {centerId}".format(
             centerId=centerId
         ))
+        configset, tokenset, session = self.get_sets_and_session()
 
-        resp = self.session.get(
+        resp = session.get(
             'https://{env}/api/v1/centers/{centerId}/sites'.format(
-                env=self.get_env(),
+                env=self.get_env(configset=configset),
                 centerId=centerId
             ),
-            headers=self.get_authorization_header()
+            headers=self.get_authorization_header(tokenset=tokenset)
         )
 
         sites = {}
@@ -173,11 +203,13 @@ class C19Impformation(object):
             siteId=siteId
         ))
 
+        configset, tokenset, session = self.get_sets_and_session()
+
         try:
-            resp = self.session.get(
+            resp = session.get(
                 'https://{env}/api/v1/citizens/{userUUID}/appointments/next'.format(
-                    env=self.get_env(),
-                    userUUID=self.config['userUUID']
+                    env=self.get_env(configset=configset),
+                    userUUID=configset['userUUID']
                 ),
                 params={
                     'timeOfDay': 'ALL_DAY',
@@ -185,7 +217,7 @@ class C19Impformation(object):
                     'lastTime': '00:00',
                     'possibleSiteId': siteId
                 },
-                headers=self.get_authorization_header()
+                headers=self.get_authorization_header(tokenset=tokenset)
             )
         except:
             print("Request failed")
