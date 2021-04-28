@@ -24,12 +24,6 @@ class C19Impformation(object):
         else:
             print("something might be of with the config file...")
             sys.exit()
-        """
-        if self.config['abusecontact']:
-            self.session.headers.update({
-                'X-Abuse-Contact': self.config['abusecontact']
-            })
-        """
 
     def get_sets_and_session(self):
         self.lastset += 1
@@ -50,6 +44,11 @@ class C19Impformation(object):
     def login(self):
         for configset in self.config:
             self.session.append(requests.Session())
+
+            if configset['abusecontact']:
+                self.session[-1].headers.update({
+                    'X-Abuse-Contact': configset['abusecontact']
+                })
 
             # Get the login-form
             resp = self.session[-1].get(
